@@ -1,0 +1,8 @@
+### BATTERY PAYLOAD KEYS (6)
+outer: data, deviceName, messageId, sn, tenantId, timestamp
+data  =  {"c":"uploadInfo","t":1789958127868,"ds":{"vers":{"module":["EC200UCNLAR02A05M08_OCPU","1.
+deviceName  =  PB****0100
+messageId  =  00065BF51AB4314EF4450FB9B4A8010D
+sn  =  PB****0100
+tenantId  =  1
+timestamp  =  1789958133395

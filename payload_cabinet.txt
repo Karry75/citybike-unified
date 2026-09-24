@@ -1,0 +1,43 @@
+### CABINET PAYLOAD KEYS (42)
+deviceName  =  86****4989
+sn  =  BE****ab72
+stores  =  [list len=3]
+stores[0].uart  =  1
+stores[0].index  =  1
+stores[0].battery  =  None
+stores[0].charging  =  0.00|0.00|32.0
+stores[0].status  =  none
+stores[0].errors  =  []
+stores[0].sensor  =  unopen|unlock|untouch
+brand  =  {...}
+brand.exchange  =  dudu-huandian
+temp  =  {...}
+temp.exchange  =  0
+temp.cabinet  =  0.0|0.0|0.0|0.0|0.0
+connections  =  [list len=1]
+connections[0].type  =  mobile
+connections[0].channel  =  4G
+connections[0].signal  =  CSQ:31
+connections[0].connect  =  on
+connections[0].imei  =  86****4989
+connections[0].iccid  =  89****411b
+connections[0].imsi  =  460082439601630
+location  =  None
+versions  =  [list len=3]
+versions[0]  =  MAIN|TP6005||1
+errors  =  [list len=0]
+status  =  {...}
+status.warm  =  off
+status.wh  =  0
+setting  =  {...}
+setting.remoteLock  =  off
+setting.warm  =  off
+setting.warmStart  =  0
+setting.warmOver  =  0
+setting.voiceLevel  =  100
+setting.checkWater  =  off
+setting.checkDoor  =  on
+setting.checkLock  =  off
+setting.checkTouch  =  on
+setting.mainLog  =  off
+setting.mcuLog  =  off
