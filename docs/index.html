@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>嘟嘟换电统一看板</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#fff; --line:#e3e8ef; --ink:#1f2937; --ink2:#5b6b7f;
+    --brand:#0f62fe; --brand-l:#eaf1ff; --head:#f7f9fc; --warn:#b45309;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:13px/1.5 "Microsoft YaHei",-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:#fff;border-bottom:1px solid var(--line);padding:12px 18px 0;position:sticky;top:0;z-index:30}
+  .title{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+  .title h1{font-size:17px;margin:0;font-weight:600}
+  .title span{color:var(--ink2);font-size:12px}
+  nav{display:flex;gap:4px}
+  nav a{padding:8px 18px;border:1px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0;
+        background:#f1f4f8;color:var(--ink2);text-decoration:none;font-size:13px;position:relative;top:1px}
+  nav a.on{background:#fff;color:var(--brand);font-weight:600;border-color:var(--line)}
+  main{padding:14px 18px 40px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+  .fld{display:flex;flex-direction:column;gap:4px}
+  .fld label{font-size:12px;color:var(--ink2)}
+  select,input,button{font:inherit;border:1px solid #cfd8e3;border-radius:5px;padding:5px 8px;background:#fff;color:var(--ink)}
+  select:focus,input:focus{outline:none;border-color:var(--brand)}
+  button{cursor:pointer;background:#fff}
+  button:hover{border-color:var(--brand);color:var(--brand)}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  button.primary:hover{background:#0b53d4;color:#fff}
+  button.ghost{border-style:dashed;color:var(--ink2)}
+  .conds{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .cond{display:flex;gap:6px;align-items:center}
+  .cond select,.cond input{min-width:130px}
+  .cond input.v{min-width:190px}
+  .ins{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--ink2)}
+  .ins b{color:var(--ink);font-size:13px}
+  .quick{display:flex;flex-wrap:wrap;gap:10px}
+  .tbl-wrap{overflow:auto;max-height:64vh;border:1px solid var(--line);border-radius:8px;background:#fff}
+  table{border-collapse:separate;border-spacing:0;font-size:12px;white-space:nowrap}
+  th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:5px 8px;text-align:left}
+  thead th{position:sticky;background:var(--head);z-index:3;cursor:pointer;font-weight:600;color:#334155}
+  thead tr.g th{top:0;font-size:11px;color:var(--brand);text-align:center;background:#eef4ff;z-index:4}
+  thead tr.h th{top:25px}
+  th .ar{color:var(--brand);margin-left:3px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.idx,th.idx{position:sticky;left:0;background:#fbfcfe;color:var(--ink2);text-align:right;z-index:5;
+                box-shadow:1px 0 0 var(--line)}
+  thead th.idx{z-index:6}
+  tbody tr:nth-child(even) td{background:#fafbfd}
+  tbody tr:hover td{background:var(--brand-l)}
+  tbody td.idx{background:#fbfcfe}
+  .pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding-top:10px;font-size:12px;color:var(--ink2)}
+  .muted{color:var(--ink2)}
+  .pill{display:inline-block;padding:1px 6px;border-radius:10px;background:#eef4ff;color:var(--brand);font-size:11px}
+  .cols{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:8px;margin-top:8px}
+  .cols h4{margin:10px 0 4px;font-size:12px;color:var(--brand)}
+  .cols label{display:inline-flex;align-items:center;gap:4px;margin:2px 10px 2px 0;font-size:12px}
+  .toast{position:fixed;right:18px;bottom:18px;background:#111827;color:#fff;padding:10px 14px;border-radius:6px;
+         font-size:12px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+  .toast.on{opacity:.94}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div id="ro-banner" style="position:fixed;right:14px;bottom:12px;z-index:99;background:#0f62fe;color:#fff;
+padding:6px 12px;border-radius:14px;font:12px/1.5 'Microsoft YaHei',sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.18)">
+静态快照 · 只读 · 数据已脱敏</div>
+<script>
+(function(){
+  var _fetch = window.fetch ? window.fetch.bind(window) : null;
+  var cache = {};
+  function load(url){
+    if(!cache[url]){
+      cache[url] = _fetch(url).then(function(r){ return r.ok ? r.json() : null; })
+        .catch(function(){ return null; });
+    }
+    return cache[url];
+  }
+  function parse(u){
+    var s = String(u === undefined || u === null ? '' : u);
+    var i = s.indexOf('api/');
+    if(i < 0) return null;
+    var p = s.slice(i + 3);
+    var query = '';
+    var q = p.indexOf('?');
+    if(q >= 0){ query = p.slice(q + 1); p = p.slice(0, q); }
+    var out = {path: '/' + p, query: query};
+    return out;
+  }
+  function val(query, key){
+    var m = query.match(new RegExp('(?:^|&)' + key + '=([^&]*)'));
+    return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+  }
+  function respond(u){
+    var o = parse(u);
+    if(!o) return null;
+    var m = val(o.query, 'm') || 'agreement';
+    if(o.path === '/api/meta') return load('data/meta.json');
+    if(o.path === '/api/rows') return load('data/rows_' + m + '.json').then(function(d){ return d || {total:0,page:1,size:0,keys:[],rows:[]}; });
+    if(o.path === '/api/count') return load('data/count_' + m + '.json').then(function(d){ return d || {total:0}; });
+    if(o.path === '/api/options'){
+      var k = val(o.query, 'k');
+      return load('data/opts_' + m + '_' + k + '.json').then(function(d){ return d || {total:0, options:[]}; });
+    }
+    return Promise.resolve({error: '静态快照为只读，该操作不可用'});
+  }
+  window.fetch = function(input, init){
+    var u = (typeof input === 'string') ? input : (input && input.url);
+    var p = respond(u);
+    if(!p) return _fetch.apply(window, arguments);
+    return p.then(function(d){
+      return new Response(JSON.stringify(d === null ? {} : d),
+        {status: 200, headers: {'Content-Type': 'application/json; charset=utf-8'}});
+    });
+  };
+})();
+</script>
+<header>
+  <div class="title">
+    <h1>嘟嘟换电统一看板</h1>
+    <span id="sub">本地数据 · 秒级查询 · 支持筛选与导出</span>
+  </div>
+  <nav id="nav"></nav>
+</header>
+<main>
+  <div class="card">
+    <div class="row">
+      <div class="fld" style="flex:1;min-width:240px">
+        <label>关键词（跨主要字段模糊匹配）</label>
+        <input id="kw" placeholder="如 手机号 / 网点名 / SN / 姓名" autocomplete="off">
+      </div>
+      <button class="primary" id="search">查询</button>
+      <button id="reset">重置筛选</button>
+      <button id="colbtn">列设置</button>
+      <span class="muted" id="hint"></span>
+    </div>
+    <div class="quick" id="quick" style="margin-top:10px"></div>
+    <div class="conds" id="conds"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="ghost" id="addcond">+ 高级条件</button>
+    </div>
+    <div class="cols hidden" id="colpanel"></div>
+  </div>
+
+  <div class="card">
+    <div class="ins">
+      <span>共 <b id="total">-</b> 行</span>
+      <span>本页 <b id="shown">-</b> 行</span>
+      <span>查询耗时 <b id="ms">-</b> ms</span>
+      <span>每页
+        <select id="size">
+          <option>20</option><option selected>50</option><option>100</option><option>200</option><option>500</option>
+        </select> 行
+      </span>
+      <span style="flex:1"></span>
+      <button class="primary" id="exp-xlsx">导出 Excel (.xlsx)</button>
+      <button id="exp-csv">导出 CSV</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:10px"><table id="tbl"></table></div>
+    <div class="pager">
+      <button id="first">首页</button>
+      <button id="prev">上一页</button>
+      <span>第 <b id="pg">1</b> / <b id="pgs">1</b> 页</span>
+      <button id="next">下一页</button>
+      <button id="last">末页</button>
+      <span>跳至 <input id="jump" style="width:56px" > 页</span>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const MENUS = ["agreement","site","cabinet","battery"];
+const DEF_MENU = "{{ menu }}";
+const OPS = {{ ops|tojson }};
+const OP_LABEL = Object.fromEntries(OPS);
+const QUICK = {{ quick|tojson }};
+const state = {menu:DEF_MENU, conds:[], quick:{}, kw:"", page:1, size:50, sort:"", order:"desc",
+               hidden:new Set(), meta:null};
+const $ = id => document.getElementById(id);
+const el = (t, a) => {const e=document.createElement(t); if(a) Object.assign(e,a); return e;};
+let toastT;
+function toast(msg){const t=$("toast"); t.textContent=msg; t.classList.add("on");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),2600);}
+
+function qs(){
+  const p = new URLSearchParams();
+  p.set("m", state.menu);
+  if(state.kw) p.set("kw", state.kw);
+  const cs = state.conds.filter(c=>c.k && c.op);
+  if(cs.length) p.set("conds", JSON.stringify(cs));
+  if(state.sort) {p.set("sort", state.sort); p.set("order", state.order);}
+  if(state.page>1) p.set("page", state.page);
+  if(state.size!=50) p.set("size", state.size);
+  return p;
+}
+function syncUrl(){history.replaceState(null,"", location.pathname + "?" + qs().toString());}
+function readUrl(){
+  const p = new URLSearchParams(location.search);
+  const m = p.get("m"); if(MENUS.includes(m)) state.menu = m;
+  state.kw = p.get("kw") || "";
+  state.size = parseInt(p.get("size")||"50",10);
+  state.page = parseInt(p.get("page")||"1",10);
+  state.sort = p.get("sort")||""; state.order = p.get("order")||"desc";
+  try{const c = JSON.parse(p.get("conds")||"[]"); if(Array.isArray(c)) state.conds=c;}catch(e){}
+  (QUICK[state.menu]||[]).forEach(([k])=>{const v=p.get("q_"+k); if(v) state.quick[k]=v;});
+}
+
+async function loadMeta(){
+  const r = await fetch("/api/meta").then(r=>r.json());
+  state.meta = r.meta;
+  if(!state.meta[state.menu]) state.menu = "agreement";
+  renderNav(); renderQuick(); renderCondEditor(); renderColPanel();
+}
+function renderNav(){
+  const nav = $("nav"); nav.innerHTML="";
+  MENUS.forEach(m=>{
+    const a = el("a",{href:"?m="+m, textContent:state.meta[m].label});
+    if(m===state.menu) a.className="on";
+    a.onclick = ev => {ev.preventDefault(); switchMenu(m);};
+    nav.appendChild(a);
+  });
+  $("sub").textContent = location.host + " · " + state.meta[state.menu].label + " · 共 " + state.meta[state.menu].keys.length + " 个字段";
+}
+function switchMenu(m){
+  if(m===state.menu) return;
+  state.menu=m; state.conds=[]; state.quick={}; state.kw=""; state.page=1; state.sort=""; state.order="desc";
+  state.hidden = new Set();
+  $("kw").value="";
+  renderNav(); renderQuick(); renderCondEditor(); renderColPanel(); syncUrl(); fetchRows();
+}
+function renderQuick(){
+  const box = $("quick"); box.innerHTML="";
+  const list = QUICK[state.menu]||[];
+  if(!list.length){box.innerHTML='<span class="muted">该菜单无快捷筛选</span>'; return;}
+  list.forEach(([k,n])=>{
+    const f = el("div",{className:"fld"});
+    f.appendChild(el("label",{textContent:n}));
+    const s = el("select"); s.dataset.k=k;
+    s.appendChild(el("option",{value:"", textContent:"全部"}));
+    if(state.quick[k]) s.appendChild(el("option",{value:state.quick[k], textContent:state.quick[k], selected:true}));
+    s.onchange = ()=>{ if(s.value) state.quick[k]=s.value; else delete state.quick[k];
+                       state.conds = state.conds.filter(c=>!(c.k===k && c.__quick));
+                       if(s.value) state.conds.push({k:k, op:"eq", v:s.value, __quick:true});
+                       state.page=1; syncUrl(); fetchRows(); };
+    f.appendChild(s); box.appendChild(f);
+  });
+  list.forEach(([k])=>fillOptions(k));
+}
+async function fillOptions(k){
+  try{
+    const r = await fetch("/api/options?m="+state.menu+"&k="+encodeURIComponent(k)).then(r=>r.json());
+    const s = document.querySelector('#quick select[data-k="'+k+'"]');
+    if(!s || !r.options) return;
+    r.options.forEach(o=>{
+      if(String(o.v)===String(state.quick[k]||"")) return;
+      s.appendChild(el("option",{value:o.v, textContent:o.v+" ("+o.n+")"}));
+    });
+  }catch(e){}
+}
+function fieldSelect(val){
+  const s = el("select");
+  const meta = state.meta[state.menu];
+  let g="";
+  meta.cols.forEach(c=>{
+    if(c.t==="group"){ g = c.n; const og = el("optgroup",{label:g}); s.appendChild(og); return;}
+    const o = el("option",{value:c.k, textContent:c.n});
+    const og = s.lastChild && s.lastChild.tagName==="OPTGROUP" ? s.lastChild : null;
+    if(og) og.appendChild(o); else s.appendChild(o);
+  });
+  if(val) s.value = val;
+  return s;
+}
+function renderCondEditor(){
+  const box = $("conds"); box.innerHTML="";
+  state.conds.filter(c=>!c.__quick).forEach(c=>box.appendChild(condRow(c)));
+}
+function condRow(c){
+  const d = el("div",{className:"cond"});
+  const fs = fieldSelect(c.k);
+  const os = el("select");
+  OPS.forEach(([v,n])=>os.appendChild(el("option",{value:v, textContent:n, selected:c.op===v})));
+  const vi = el("input",{className:"v", value: c.op==="between" ? (Array.isArray(c.v)?c.v.join(","):(c.v||"")) : (c.v==null?"":c.v)});
+  const del = el("button",{textContent:"移除"});
+  const need = () => !["empty","notempty"].includes(os.value);
+  vi.style.display = need()?"":"none";
+  fs.onchange = ()=>{c.k=fs.value;};
+  os.onchange = ()=>{c.op=os.value; vi.style.display = need()?"":"none";};
+  vi.oninput = ()=>{c.v = vi.value;};
+  del.onclick = ()=>{state.conds = state.conds.filter(x=>x!==c); condRow;
+                     d.remove();};
+  [fs,os,vi,del].forEach(x=>d.appendChild(x));
+  return d;
+}
+function renderColPanel(){
+  const p = $("colpanel"); p.innerHTML="";
+  const meta = state.meta[state.menu];
+  let cur=null, wrap=null;
+  meta.cols.forEach(c=>{
+    if(c.t==="group"){ cur = c.n; wrap = el("div");
+      wrap.appendChild(el("h4",{textContent:c.n})); p.appendChild(wrap); return; }
+    if(!wrap){wrap = el("div"); p.appendChild(wrap);}
+    const cb = el("input",{type:"checkbox", checked: !state.hidden.has(c.k)});
+    cb.onchange = ()=>{ if(cb.checked) state.hidden.delete(c.k); else state.hidden.add(c.k); renderTable(); };
+    const l = el("label"); l.appendChild(cb); l.appendChild(document.createTextNode(c.n));
+    wrap.appendChild(l);
+  });
+  const bar = el("div",{className:"row", style:"margin-top:6px"});
+  const all = el("button",{textContent:"全选"}); all.onclick=()=>{state.hidden.clear(); renderColPanel(); renderTable();};
+  const none = el("button",{textContent:"全不选"}); none.onclick=()=>{state.meta[state.menu].keys.forEach(k=>state.hidden.add(k)); renderColPanel(); renderTable();};
+  bar.appendChild(all); bar.appendChild(none); p.appendChild(bar);
+}
+
+function visibleKeys(){
+  const all = state.meta[state.menu].keys;
+  const v = all.filter(k=>!state.hidden.has(k));
+  return v.length? v : all;
+}
+let lastRows = [], lastKeys = [];
+async function fetchRows(){
+  syncUrl();
+  const p = qs(); p.set("page", state.page); p.set("size", state.size);
+  let r;
+  try{ r = await fetch("/api/rows?"+p.toString()).then(x=>x.json()); }
+  catch(e){ toast("查询失败："+e); return; }
+  if(r.error){ toast("查询失败："+r.error); return; }
+  lastRows = r.rows; lastKeys = r.keys;
+  $("total").textContent = r.total.toLocaleString();
+  $("shown").textContent = r.rows.length;
+  $("ms").textContent = r.ms;
+  const pgs = Math.max(1, Math.ceil(r.total/state.size));
+  $("pg").textContent = state.page; $("pgs").textContent = pgs;
+  renderTable();
+}
+function renderTable(){
+  const meta = state.meta[state.menu];
+  const keys = visibleKeys();
+  const kn = {}; meta.cols.forEach(c=>{ if(c.t!=="group") kn[c.k]=c; });
+  const t = $("tbl"); t.innerHTML="";
+  const thead = el("thead");
+  const gr = el("tr",{className:"g"}), hr = el("tr",{className:"h"});
+  let gi=0, giStart=0, giMap=[];
+  meta.cols.forEach(c=>{ if(c.t==="group") giMap.push({n:c.n, keys:[]});
+                         else if(giMap.length) giMap[giMap.length-1].keys.push(c.k); });
+  gr.appendChild(el("th",{className:"idx", textContent:"#"}));
+  giMap.forEach(g=>{
+    const vis = g.keys.filter(k=>keys.includes(k));
+    if(!vis.length) return;
+    const th = el("th",{textContent:g.n, colSpan:vis.length});
+    gr.appendChild(th);
+  });
+  hr.appendChild(el("th",{className:"idx", textContent:"序号"}));
+  keys.forEach(k=>{
+    const c = kn[k];
+    const th = el("th",{textContent:c.n});
+    if(state.sort===k) th.appendChild(el("span",{className:"ar", textContent: state.order==="desc"?"▼":"▲"}));
+    th.onclick = ()=>{ if(state.sort===k) state.order = state.order==="desc"?"asc":"desc";
+                       else {state.sort=k; state.order = ["int","num","money","time"].includes(c.t)?"desc":"asc";}
+                       state.page=1; fetchRows(); };
+    hr.appendChild(th);
+  });
+  thead.appendChild(gr); thead.appendChild(hr); t.appendChild(thead);
+  const tb = el("tbody");
+  lastRows.forEach((row,i)=>{
+    const tr = el("tr");
+    tr.appendChild(el("td",{className:"idx", textContent: (state.page-1)*state.size + i + 1}));
+    keys.forEach(k=>{
+      const j = lastKeys.indexOf(k);
+      const c = kn[k];
+      const td = el("td",{textContent: j>=0 ? (row[j]||"") : ""});
+      if(c && ["int","num","money"].includes(c.t)) td.className="num";
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+  if(!lastRows.length){
+    const tr = el("tr"); const td = el("td",{colSpan:keys.length+1, textContent:"无匹配数据"});
+    td.style.textAlign="center"; td.style.color="#94a3b8"; td.style.padding="18px";
+    tr.appendChild(td); tb.appendChild(tr);
+  }
+}
+function exportFile(fmt){
+  const p = qs(); p.set("fmt", fmt);
+  const url = "/api/export?"+p.toString();
+  toast(fmt==="csv" ? "正在导出 CSV（按当前筛选全部行）…" : "正在导出 Excel（12万行约需 1-2 分钟，请勿关闭页面）…");
+  const a = el("a",{href:url}); document.body.appendChild(a); a.click(); a.remove();
+}
+function bind(){
+  $("search").onclick = ()=>{state.kw = $("kw").value.trim(); state.page=1; syncUrl(); fetchRows();};
+  $("kw").onkeydown = e=>{ if(e.key==="Enter") $("search").click(); };
+  $("reset").onclick = ()=>{ state.conds=[]; state.quick={}; state.kw=""; state.page=1; state.hidden=new Set();
+                             $("kw").value=""; renderQuick(); renderCondEditor(); renderColPanel(); fetchRows(); };
+  $("addcond").onclick = ()=>{ const c = {k:"", op:"like", v:""}; state.conds.push(c); $("conds").appendChild(condRow(c)); };
+  $("colbtn").onclick = ()=>{ $("colpanel").classList.toggle("hidden"); };
+  $("size").onchange = ()=>{ state.size = parseInt($("size").value,10); state.page=1; fetchRows(); };
+  $("first").onclick = ()=>{state.page=1; fetchRows();};
+  $("prev").onclick = ()=>{if(state.page>1){state.page--; fetchRows();}};
+  $("next").onclick = ()=>{const pgs=Math.max(1,Math.ceil((+$("total").textContent.replace(/,/g,""))/state.size));
+                            if(state.page<pgs){state.page++; fetchRows();}};
+  $("last").onclick = ()=>{const pgs=Math.max(1,Math.ceil((+$("total").textContent.replace(/,/g,""))/state.size));
+                            state.page=pgs; fetchRows();};
+  $("jump").onkeydown = e=>{ if(e.key==="Enter"){ const v=parseInt($("jump").value||"1",10);
+      const pgs=Math.max(1,Math.ceil((+$("total").textContent.replace(/,/g,""))/state.size));
+      state.page=Math.min(Math.max(v,1),pgs); fetchRows(); } };
+  $("exp-csv").onclick = ()=>exportFile("csv");
+  $("exp-xlsx").onclick = ()=>exportFile("xlsx");
+}
+(async function(){
+  readUrl(); bind(); await loadMeta();
+  $("kw").value = state.kw; $("size").value = String(state.size);
+  if(state.conds.filter(c=>!c.__quick).length){ $("conds").innerHTML=""; state.conds.filter(c=>!c.__quick).forEach(c=>$("conds").appendChild(condRow(c))); }
+  await fetchRows();
+})();
+</script>
+</body>
+</html>
