@@ -59,10 +59,10 @@ def load_dims(ac, bc):
     d = {}
     d["agency"] = {}
     try:
-        for r in q(bc, "SELECT id, name FROM sys_cm_agency WHERE is_del=0"):
+        for r in q(bc, "SELECT id, name FROM t_cm_agency WHERE is_del=0"):
             d["agency"][int(r["id"])] = s(r["name"])
     except Exception as e:
-        log("  sys_cm_agency 读取失败: %s" % e)
+        log("  t_cm_agency 读取失败: %s" % e)
     for t in ("t_merchant", "t_site_store_employee", "t_distributor", "t_promoter",
               "t_exchange_rent_package", "t_battery_product", "t_battery_series"):
         try:
@@ -404,7 +404,7 @@ def main():
                 "rent_remain_days": round((exp_ms - today_ms) / float(DAY), 1) if exp_ms > today_ms else 0,
                 "package_price": yuan(pk.get("real_fee") or pk.get("fee")),
                 "package_name": s(pk.get("name")) or s(p1.get("package_name")),
-                "province": s(r.get("sys_city_name")), "city": s(site.get("city")),
+                "province": s(r.get("t_city_name")), "city": s(site.get("city")),
                 "area": s(site.get("area")), "street": s(site.get("street")),
                 "community": s(site.get("community")),
                 "site_id": r.get("site_id"), "site_name": s(site.get("name")),
