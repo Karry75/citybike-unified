@@ -71,13 +71,20 @@ padding:6px 12px;border-radius:14px;font:12px/1.5 'Microsoft YaHei',sans-serif;b
 <script>
 (function(){
   var _fetch = window.fetch ? window.fetch.bind(window) : null;
+  var BASE = (function(){
+    var p = location.pathname || '/';
+    if(/\/$/.test(p)) return p;
+    if(/[^\/]*\.[^\/]*$/.test(p)) return p.replace(/[^\/]*$/, '');
+    return p + '/';
+  })();
   var cache = {};
   function load(url){
-    if(!cache[url]){
-      cache[url] = _fetch(url).then(function(r){ return r.ok ? r.json() : null; })
+    var full = /^(https?:)?\/\//.test(url) ? url : BASE + url;
+    if(!cache[full]){
+      cache[full] = _fetch(full).then(function(r){ return r.ok ? r.json() : null; })
         .catch(function(){ return null; });
     }
-    return cache[url];
+    return cache[full];
   }
   function parse(u){
     var s = String(u === undefined || u === null ? '' : u);
@@ -87,7 +94,7 @@ padding:6px 12px;border-radius:14px;font:12px/1.5 'Microsoft YaHei',sans-serif;b
     var query = '';
     var q = p.indexOf('?');
     if(q >= 0){ query = p.slice(q + 1); p = p.slice(0, q); }
-    var out = {path: '/' + p, query: query};
+    var out = {path: '/api' + p, query: query};
     return out;
   }
   function val(query, key){
@@ -173,10 +180,10 @@ padding:6px 12px;border-radius:14px;font:12px/1.5 'Microsoft YaHei',sans-serif;b
 <div class="toast" id="toast"></div>
 <script>
 const MENUS = ["agreement","site","cabinet","battery"];
-const DEF_MENU = "{{ menu }}";
-const OPS = {{ ops|tojson }};
+const DEF_MENU = "agreement";
+const OPS = [["like","包含"],["eq","等于"],["ne","不等于"],["gt","大于"],["ge","大于等于"],["lt","小于"],["le","小于等于"],["between","区间"],["empty","为空"],["notempty","不为空"]];
 const OP_LABEL = Object.fromEntries(OPS);
-const QUICK = {{ quick|tojson }};
+const QUICK = {"agreement":[["agreement_type","协议类型"],["status","协议状态"],["is_lowfreq","是否低频"],["lowfreq_level","低频档位"],["is_first","是否首次签约"],["city","城市"],["site_name","签约网点"],["merchant_name","商户"],["agency_name","代理商"],["deposit_status","押金状态"]],"site":[["site_type","网点类型"],["site_status","营业状态"],["city","城市"],["area","区域"],["agency_name","代理商"],["merchant_name","商户"],["has_exchange","是否可换电"],["cabinet_status","换电柜状态"],["is_24h","是否24小时"]],"cabinet":[["online_status","在线状态"],["device_status","设备状态"],["city","城市"],["site_name","所属网点"],["agency_name","代理商"],["slot_total","总仓位数"],["rent_status","租借状态"]],"battery":[["online_status","在线状态"],["charge_status","充电状态"],["discharge_status","放电状态"],["city","城市"],["site_name","所属网点"],["cabinet_sn","所在换电柜"],["slot_type","仓位类型"]]};
 const state = {menu:DEF_MENU, conds:[], quick:{}, kw:"", page:1, size:50, sort:"", order:"desc",
                hidden:new Set(), meta:null};
 const $ = id => document.getElementById(id);
@@ -210,7 +217,12 @@ function readUrl(){
 
 async function loadMeta(){
   const r = await fetch("/api/meta").then(r=>r.json());
-  state.meta = r.meta;
+  state.meta = (r && r.meta) || {};
+  if(!state.meta.agreement){
+    $("hint").textContent = "快照数据加载失败，请刷新重试";
+    toast("快照数据加载失败：" + location.pathname);
+    return;
+  }
   if(!state.meta[state.menu]) state.menu = "agreement";
   renderNav(); renderQuick(); renderCondEditor(); renderColPanel();
 }
@@ -383,10 +395,7 @@ function renderTable(){
   }
 }
 function exportFile(fmt){
-  const p = qs(); p.set("fmt", fmt);
-  const url = "/api/export?"+p.toString();
-  toast(fmt==="csv" ? "正在导出 CSV（按当前筛选全部行）…" : "正在导出 Excel（12万行约需 1-2 分钟，请勿关闭页面）…");
-  const a = el("a",{href:url}); document.body.appendChild(a); a.click(); a.remove();
+  toast("静态快照为只读，导出功能未开放");
 }
 function bind(){
   $("search").onclick = ()=>{state.kw = $("kw").value.trim(); state.page=1; syncUrl(); fetchRows();};
